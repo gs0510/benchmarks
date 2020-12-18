@@ -29,6 +29,12 @@ let commit =
   let doc = Arg.info ~doc:"Extract commit timers" [ "c"; "commit" ] in
   Arg.(value @@ flag doc)
 
+let irmin_bench =
+  let doc =
+    Arg.info ~doc:"Extract commit timers from irmin benchs" [ "irmin" ]
+  in
+  Arg.(value @@ flag doc)
+
 let read_file filename extract =
   let lines = ref [] in
   let chan = open_in filename in
@@ -179,7 +185,19 @@ let extract_commit s =
     Some (0.0, seconds)
   with Not_found -> None
 
-let main file separate objects_added maxrss commit run_id =
+let commit_in_bench s =
+  let validated = "completed in" in
+  try
+    let pos = search_forward (regexp validated) s 0 in
+    let time =
+      let ls = string_after s pos |> split (regexp "[ \t,;]+") in
+      List.nth ls 2
+    in
+    Some (0.0, time)
+  with Not_found -> None
+
+let main file separate objects_added maxrss commit irmin_bench run_id =
+  let run_id = Printf.sprintf "%d" run_id in
   if objects_added then
     let lines = read_file file objects in
     write_file_1 (run_id ^ "-adds") lines
@@ -194,13 +212,17 @@ let main file separate objects_added maxrss commit run_id =
   else if commit then
     let lines = read_file file extract_commit in
     write_file (run_id ^ "-commit") lines
+  else if irmin_bench then
+    let lines = read_file file commit_in_bench in
+    write_file_1 "commit" lines
   else
     let lines = read_file file extract_from_line in
     write_file (run_id ^ "-completed_times") lines
 
 let main_term =
   Term.(
-    const main $ file $ separate_logs $ objects_added $ maxrss $ commit $ run_id)
+    const main $ file $ separate_logs $ objects_added $ maxrss $ commit
+    $ irmin_bench $ run_id)
 
 let () =
   let info = Term.info "Extract from the logs of a tezos node" in
