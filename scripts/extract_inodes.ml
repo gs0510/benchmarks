@@ -17,23 +17,17 @@ let run_id =
   let doc = Arg.info ~doc:"Run id." [ "i"; "id" ] in
   Arg.(value @@ opt int 1 doc)
 
-let read_file filename extract =
-  let lines = ref [] in
+let read_file filename extract run_id =
   let chan = open_in filename in
+  let oc = open_out (run_id ^ "-context") in
   try
     while true do
       let line = input_line chan in
-      match extract line with None -> () | Some l -> lines := l :: !lines
-    done;
-    !lines
+      match extract line with None -> () | Some l -> Printf.fprintf oc "%s\n" l
+    done
   with End_of_file ->
     close_in chan;
-    List.rev !lines
-
-let write_file file lines =
-  let oc = open_out file in
-  List.iter (fun (l) -> Printf.fprintf oc "%s\n" l) lines;
-  close_out oc
+    close_out oc
 
 let context_lines s =
   let validated = "context" in
@@ -46,8 +40,7 @@ let context_lines s =
 let main file run_id context =
   let run_id = Printf.sprintf "%d" run_id in
   if context then
-    let lines = read_file file context_lines in
-    write_file (run_id ^ "-context") lines
+    read_file file context_lines run_id
 
 let main_term = Term.(const main $ file $ run_id $ context_tag )
 
